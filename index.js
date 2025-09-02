@@ -2,6 +2,9 @@ const express = require('express');
 const app = express();
 const cors = require('cors');
 require('dotenv').config();
+// const { GoogleGenerativeAI } = require("@google/generative-ai");
+const axios = require("axios");
+// const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const port = process.env.PORT || 3000
 const uri = process.env.URI;
@@ -44,9 +47,9 @@ async function run() {
                         res.send({ message: "No class found for this email" });
                     }
                 } else {
-                    
-                        res.send({ message: "No classes found" });
-                    
+
+                    res.send({ message: "No classes found" });
+
                 }
             } catch (error) {
                 console.error(error);
@@ -79,6 +82,18 @@ async function run() {
             );
             res.send(result);
         });
+
+
+
+
+
+
+
+
+
+       
+
+
     } finally {
 
     }
