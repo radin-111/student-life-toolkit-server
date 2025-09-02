@@ -2,9 +2,7 @@ const express = require('express');
 const app = express();
 const cors = require('cors');
 require('dotenv').config();
-// const { GoogleGenerativeAI } = require("@google/generative-ai");
-const axios = require("axios");
-// const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
 
 const port = process.env.PORT || 3000
 const uri = process.env.URI;
@@ -15,9 +13,7 @@ app.use(express.json());
 
 
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-const e = require('express');
-
-
+ 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
     serverApi: {
@@ -29,6 +25,7 @@ const client = new MongoClient(uri, {
 
 const db = client.db("student_tooltip");
 const classCollection = db.collection("classes");
+const transactionCollection = db.collection("transactions");
 
 
 async function run() {
@@ -88,10 +85,67 @@ async function run() {
 
 
 
+        // server.js (add to your existing Express app)
 
-
-
+        // Transactions collection
        
+
+        // Get all transactions
+        app.get("/transactions", async (req, res) => {
+            try {
+                const { email } = req.query;
+                const query = email ? { email } : {};
+                const transactions = await transactionCollection.find(query).toArray();
+                res.send(transactions);
+            } catch (error) {
+                console.error(error);
+                res.status(500).send({ message: "Server error" });
+            }
+        });
+
+        // Add new transaction
+        app.post("/transactions", async (req, res) => {
+            try {
+                const newTransaction = req.body; // { email, type, amount, category, date, notes }
+                const result = await transactionCollection.insertOne(newTransaction);
+                res.send(result);
+            } catch (error) {
+                console.error(error);
+                res.status(500).send({ message: "Server error" });
+            }
+        });
+
+        // Update transaction
+        app.put("/transactions/:id", async (req, res) => {
+            try {
+                const id = req.params.id;
+                const updated = req.body;
+                const result = await transactionCollection.updateOne(
+                    { _id: new ObjectId(id) },
+                    { $set: updated }
+                );
+                res.send(result);
+            } catch (error) {
+                console.error(error);
+                res.status(500).send({ message: "Server error" });
+            }
+        });
+
+        // Delete transaction
+        app.delete("/transactions/:id", async (req, res) => {
+            try {
+                const id = req.params.id;
+                const result = await transactionCollection.deleteOne({ _id: new ObjectId(id) });
+                res.send(result);
+            } catch (error) {
+                console.error(error);
+                res.status(500).send({ message: "Server error" });
+            }
+        });
+
+
+
+
 
 
     } finally {
