@@ -13,7 +13,7 @@ app.use(express.json());
 
 
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
- 
+
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
     serverApi: {
@@ -88,13 +88,17 @@ async function run() {
         // server.js (add to your existing Express app)
 
         // Transactions collection
-       
+
 
         // Get all transactions
         app.get("/transactions", async (req, res) => {
             try {
                 const { email } = req.query;
-                const query = email ? { email } : {};
+                const query = { email };
+                if(!email){
+                    res.send({ message: "No transactions found" });
+                    return;
+                }
                 const transactions = await transactionCollection.find(query).toArray();
                 res.send(transactions);
             } catch (error) {
