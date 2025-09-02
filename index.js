@@ -12,6 +12,7 @@ app.use(express.json());
 
 
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const e = require('express');
 
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -30,9 +31,29 @@ const classCollection = db.collection("classes");
 async function run() {
     try {
         app.get("/classes", async (req, res) => {
-            const result = await classCollection.find().toArray();
-            res.send(result);
+            try {
+                const { email } = req.query;
+
+                if (email) {
+                    const query = { email: email };
+                    const result = await classCollection.find(query).toArray();
+
+                    if (result.length > 0) {
+                        res.send(result);
+                    } else {
+                        res.send({ message: "No class found for this email" });
+                    }
+                } else {
+                    
+                        res.send({ message: "No classes found" });
+                    
+                }
+            } catch (error) {
+                console.error(error);
+                res.status(500).send({ message: "Server error" });
+            }
         });
+
 
         // Add new class
         app.post("/classes", async (req, res) => {
