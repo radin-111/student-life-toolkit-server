@@ -26,7 +26,7 @@ const client = new MongoClient(uri, {
 const db = client.db("student_tooltip");
 const classCollection = db.collection("classes");
 const transactionCollection = db.collection("transactions");
-
+const taskCollection = db.collection("tasks");
 
 async function run() {
     try {
@@ -95,7 +95,7 @@ async function run() {
             try {
                 const { email } = req.query;
                 const query = { email };
-                if(!email){
+                if (!email) {
                     res.send({ message: "No transactions found" });
                     return;
                 }
@@ -143,6 +143,183 @@ async function run() {
                 res.send(result);
             } catch (error) {
                 console.error(error);
+                res.status(500).send({ message: "Server error" });
+            }
+        });
+
+
+
+        const { ObjectId } = require("mongodb");
+
+        // ===== TASKS CRUD =====
+
+        // Create a new task
+        app.post("/tasks", async (req, res) => {
+            try {
+                const {
+                    title,
+                    subject,
+                    topic = "",
+                    priority = "medium",
+                    status = "todo",
+                    deadline,
+                    scheduledAt,
+                    durationMinutes = 60,
+                    email,
+                } = req.body;
+
+                if (!email) return res.status(400).send({ message: "Email is required" });
+
+                const task = {
+                    title,
+                    subject,
+                    topic,
+                    priority,
+                    status,
+                    deadline: deadline ? new Date(deadline) : null,
+                    scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
+                    durationMinutes,
+                    email,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                };
+
+                const result = await taskCollection.insertOne(task);
+                res.send(result);
+            } catch (err) {
+                console.error(err);
+                res.status(500).send({ message: "Server error" });
+            }
+        });
+
+        // Get all tasks (optionally filter by email)
+        app.get("/tasks", async (req, res) => {
+            try {
+                const { email } = req.query;
+                const query = email ? { email } : {};
+                const tasks = await taskCollection.find(query).sort({ createdAt: -1 }).toArray();
+                res.send(tasks);
+            } catch (err) {
+                console.error(err);
+                res.status(500).send({ message: "Server error" });
+            }
+        });
+
+        // Get single task
+        app.get("/tasks/:id", async (req, res) => {
+            try {
+                const task = await taskCollection.findOne({ _id: new ObjectId(req.params.id) });
+                if (!task) return res.status(404).send({ message: "Task not found" });
+                res.send(task);
+            } catch (err) {
+                console.error(err);
+                res.status(500).send({ message: "Server error" });
+            }
+        });
+
+        // Update task (any field)
+        app.put("/tasks/:id", async (req, res) => {
+            try {
+                const updated = { ...req.body, updatedAt: new Date() };
+                const result = await taskCollection.updateOne(
+                    { _id: new ObjectId(req.params.id) },
+                    { $set: updated }
+                );
+                res.send(result);
+            } catch (err) {
+                console.error(err);
+                res.status(500).send({ message: "Server error" });
+            }
+        });
+
+        // Update only task status
+        app.patch("/tasks/:id/status", async (req, res) => {
+            try {
+                const { status } = req.body;
+                if (!status) return res.status(400).send({ message: "Status is required" });
+
+                const result = await taskCollection.updateOne(
+                    { _id: new ObjectId(req.params.id) },
+                    { $set: { status, updatedAt: new Date() } }
+                );
+                res.send(result);
+            } catch (err) {
+                console.error(err);
+                res.status(500).send({ message: "Server error" });
+            }
+        });
+
+        // Delete task
+        app.delete("/tasks/:id", async (req, res) => {
+            try {
+                const result = await taskCollection.deleteOne({ _id: new ObjectId(req.params.id) });
+                res.send(result);
+            } catch (err) {
+                console.error(err);
+                res.status(500).send({ message: "Server error" });
+            }
+        });
+
+        // ===== STATS =====
+
+        // Weekly progress by user
+        // GET /stats/weekly?start=YYYY-MM-DD&email=user@example.com
+        // Weekly progress by user
+        // ===== STATS =====
+
+        
+        app.get("/stats/weekly", async (req, res) => {
+            try {
+                const { start, email } = req.query;
+                if (!email) return res.status(400).send({ message: "Email is required" });
+
+                const startDate = start ? new Date(start) : new Date();
+                startDate.setHours(0, 0, 0, 0);
+
+                const endDate = new Date(startDate);
+                endDate.setDate(endDate.getDate() + 7);
+                endDate.setHours(23, 59, 59, 999);
+
+                // Aggregation: include all tasks for this user that are either:
+                // 1. Have deadline in the week
+                // 2. OR are inprogress/todo (even without deadline)
+                const aggregation = [
+                    {
+                        $match: {
+                            email,
+                            $or: [
+                                { deadline: { $gte: startDate, $lte: endDate } },
+                                { status: { $in: ["inprogress", "todo", "done"] } }
+                            ]
+                        },
+                    },
+                    {
+                        $group: {
+                            _id: "$status",
+                            count: { $sum: 1 },
+                        },
+                    },
+                ];
+
+                const result = await taskCollection.aggregate(aggregation).toArray();
+
+                // Initialize counts
+                let done = 0,
+                    inProgress = 0,
+                    todo = 0;
+
+                result.forEach((r) => {
+                    if (r._id === "done") done = r.count;
+                    else if (r._id === "inprogress") inProgress = r.count;
+                    else if (r._id === "todo") todo = r.count;
+                });
+
+                const total = done + inProgress + todo;
+                const percent = total ? Math.round((done / total) * 100) : 0;
+
+                res.send({ total, done, inProgress, todo, percent });
+            } catch (err) {
+                console.error(err);
                 res.status(500).send({ message: "Server error" });
             }
         });
