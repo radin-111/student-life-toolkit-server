@@ -1,11 +1,12 @@
+require('dotenv').config();
 const express = require('express');
 const app = express();
 const cors = require('cors');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-require('dotenv').config();
+
 
 let admin = require("firebase-admin");
-const decodedKey = Buffer.from(process.env.KEY, 'base64').toString('utf8');
+const decodedKey = Buffer.from(process.env.FB_KEY, 'base64').toString('utf8');
 let serviceAccount = JSON.parse(decodedKey);
 
 admin.initializeApp({
@@ -14,8 +15,8 @@ admin.initializeApp({
 
 
 
-const port = process.env.PORT || 3000
-const uri = process.env.URI;
+const port =  3000
+const uri = process.env.DB_URI;
 
 
 app.use(cors());
