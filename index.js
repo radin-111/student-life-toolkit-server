@@ -5,20 +5,22 @@ const cors = require('cors');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 
-let admin = require("firebase-admin");
+
+
+// Firebase Admin
+const admin = require("firebase-admin");
 const decodedKey = Buffer.from(process.env.FB_KEY, 'base64').toString('utf8');
-let serviceAccount = JSON.parse(decodedKey);
+const serviceAccount = JSON.parse(decodedKey);
 
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccount)
 });
 
-
-
-const port =  3000
+// Environment / Database
+const port = process.env.PORT || 3000;
 const uri = process.env.DB_URI;
 
-
+// Middleware
 app.use(cors());
 app.use(express.json());
 
@@ -47,8 +49,8 @@ async function run() {
         const verifyUser = async (req, res, next) => {
 
             const authHeader = req.headers.authorization;
-            
-            
+
+
 
             if (!authHeader) {
                 return res.status(401).send({ message: 'unauthorized access' })
@@ -74,7 +76,7 @@ async function run() {
 
 
 
-        app.get("/classes",verifyUser, async (req, res) => {
+        app.get("/classes", verifyUser, async (req, res) => {
             try {
                 const { email } = req.query;
 
@@ -100,21 +102,21 @@ async function run() {
 
 
         // Add new class
-        app.post("/classes",verifyUser, async (req, res) => {
+        app.post("/classes", verifyUser, async (req, res) => {
             const newClass = req.body;
             const result = await classCollection.insertOne(newClass);
             res.send(result);
         });
 
         // Delete class
-        app.delete("/classes/:id",verifyUser, async (req, res) => {
+        app.delete("/classes/:id", verifyUser, async (req, res) => {
             const id = req.params.id;
             const result = await classCollection.deleteOne({ _id: new ObjectId(id) });
             res.send(result);
         });
 
         // Update class
-        app.put("/classes/:id",verifyUser, async (req, res) => {
+        app.put("/classes/:id", verifyUser, async (req, res) => {
             const id = req.params.id;
             const updated = req.body;
             const result = await classCollection.updateOne(
@@ -135,7 +137,7 @@ async function run() {
 
 
         // Get all transactions
-        app.get("/transactions",verifyUser, async (req, res) => {
+        app.get("/transactions", verifyUser, async (req, res) => {
             try {
                 const { email } = req.query;
                 const query = { email };
@@ -152,7 +154,7 @@ async function run() {
         });
 
         // Add new transaction
-        app.post("/transactions",verifyUser, async (req, res) => {
+        app.post("/transactions", verifyUser, async (req, res) => {
             try {
                 const newTransaction = req.body; // { email, type, amount, category, date, notes }
                 const result = await transactionCollection.insertOne(newTransaction);
@@ -164,7 +166,7 @@ async function run() {
         });
 
         // Update transaction
-        app.put("/transactions/:id",verifyUser, async (req, res) => {
+        app.put("/transactions/:id", verifyUser, async (req, res) => {
             try {
                 const id = req.params.id;
                 const updated = req.body;
@@ -180,7 +182,7 @@ async function run() {
         });
 
         // Delete transaction
-        app.delete("/transactions/:id",verifyUser, async (req, res) => {
+        app.delete("/transactions/:id", verifyUser, async (req, res) => {
             try {
                 const id = req.params.id;
                 const result = await transactionCollection.deleteOne({ _id: new ObjectId(id) });
@@ -193,12 +195,12 @@ async function run() {
 
 
 
-        
+
 
         // ===== TASKS CRUD =====
 
         // Create a new task
-        app.post("/tasks",verifyUser, async (req, res) => {
+        app.post("/tasks", verifyUser, async (req, res) => {
             try {
                 const {
                     title,
@@ -237,7 +239,7 @@ async function run() {
         });
 
         // Get all tasks (optionally filter by email)
-        app.get("/tasks",verifyUser, async (req, res) => {
+        app.get("/tasks", verifyUser, async (req, res) => {
             try {
                 const { email } = req.query;
                 const query = email ? { email } : {};
@@ -250,7 +252,7 @@ async function run() {
         });
 
         // Get single task
-        app.get("/tasks/:id",verifyUser, async (req, res) => {
+        app.get("/tasks/:id", verifyUser, async (req, res) => {
             try {
                 const task = await taskCollection.findOne({ _id: new ObjectId(req.params.id) });
                 if (!task) return res.status(404).send({ message: "Task not found" });
@@ -262,7 +264,7 @@ async function run() {
         });
 
         // Update task (any field)
-        app.put("/tasks/:id",verifyUser, async (req, res) => {
+        app.put("/tasks/:id", verifyUser, async (req, res) => {
             try {
                 const updated = { ...req.body, updatedAt: new Date() };
                 const result = await taskCollection.updateOne(
@@ -277,7 +279,7 @@ async function run() {
         });
 
         // Update only task status
-        app.patch("/tasks/:id/status",verifyUser, async (req, res) => {
+        app.patch("/tasks/:id/status", verifyUser, async (req, res) => {
             try {
                 const { status } = req.body;
                 if (!status) return res.status(400).send({ message: "Status is required" });
@@ -294,7 +296,7 @@ async function run() {
         });
 
         // Delete task
-        app.delete("/tasks/:id",verifyUser, async (req, res) => {
+        app.delete("/tasks/:id", verifyUser, async (req, res) => {
             try {
                 const result = await taskCollection.deleteOne({ _id: new ObjectId(req.params.id) });
                 res.send(result);
@@ -312,7 +314,7 @@ async function run() {
         // ===== STATS =====
 
 
-        app.get("/stats/weekly",verifyUser, async (req, res) => {
+        app.get("/stats/weekly", verifyUser, async (req, res) => {
             try {
                 const { start, email } = req.query;
                 if (!email) return res.status(400).send({ message: "Email is required" });

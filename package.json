@@ -18,6 +18,10 @@
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
     "firebase-admin": "^13.5.0",
-    "mongodb": "^6.19.0"
+    "fs": "^0.0.1-security",
+    "mongodb": "^6.19.0",
+    "multer": "^2.0.2",
+    "openai": "^5.19.1",
+    "pdf-parse": "^1.1.1"
   }
 }
