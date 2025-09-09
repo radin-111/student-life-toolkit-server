@@ -375,6 +375,204 @@ async function run() {
 
 
 
+
+
+        app.get("/stats/tasks/priority", verifyUser, async (req, res) => {
+            try {
+                const { email } = req.query;
+                if (!email) return res.status(400).send({ message: "Email is required" });
+
+                const aggregation = [
+                    { $match: { email } },
+                    { $group: { _id: "$priority", count: { $sum: 1 } } }
+                ];
+
+                const result = await taskCollection.aggregate(aggregation).toArray();
+                res.send(result);
+            } catch (err) {
+                console.error(err);
+                res.status(500).send({ message: "Server error" });
+            }
+        });
+
+        // 3. Daily Completed Tasks Trend
+        app.get("/stats/tasks/daily", verifyUser, async (req, res) => {
+            try {
+                const { email, days = 7 } = req.query;
+                if (!email) return res.status(400).send({ message: "Email is required" });
+
+                const startDate = new Date();
+                startDate.setDate(startDate.getDate() - Number(days));
+
+                const aggregation = [
+                    { $match: { email, status: "done", updatedAt: { $gte: startDate } } },
+                    {
+                        $group: {
+                            _id: { $dateToString: { format: "%Y-%m-%d", date: "$updatedAt" } },
+                            count: { $sum: 1 }
+                        }
+                    },
+                    { $sort: { _id: 1 } }
+                ];
+
+                const result = await taskCollection.aggregate(aggregation).toArray();
+                res.send(result);
+            } catch (err) {
+                console.error(err);
+                res.status(500).send({ message: "Server error" });
+            }
+        });
+
+        // 4. Transaction Summary
+        app.get("/stats/transactions", verifyUser, async (req, res) => {
+            try {
+                const { email } = req.query;
+                if (!email) return res.status(400).send({ message: "Email is required" });
+
+                const aggregation = [
+                    { $match: { email } },
+                    { $group: { _id: "$type", total: { $sum: "$amount" } } }
+                ];
+
+                const result = await transactionCollection.aggregate(aggregation).toArray();
+
+                let income = 0, expense = 0;
+                result.forEach(r => {
+                    if (r._id === "income") income = r.total;
+                    if (r._id === "expense") expense = r.total;
+                });
+
+                res.send({ income, expense, balance: income - expense });
+            } catch (err) {
+                console.error(err);
+                res.status(500).send({ message: "Server error" });
+            }
+        });
+
+        // 5. Class Count by Subject
+        app.get("/stats/classes", verifyUser, async (req, res) => {
+            try {
+                const { email } = req.query;
+                if (!email) return res.status(400).send({ message: "Email is required" });
+
+                const aggregation = [
+                    { $match: { email } },
+                    { $group: { _id: "$subject", total: { $sum: 1 } } }
+                ];
+
+                const result = await classCollection.aggregate(aggregation).toArray();
+                res.send(result);
+            } catch (err) {
+                console.error(err);
+                res.status(500).send({ message: "Server error" });
+            }
+        });
+
+
+
+
+
+        // ================== STATISTICS APIs ==================
+
+        // Overview (total counts + income/expense sums)
+        app.get("/stats/overview", verifyUser, async (req, res) => {
+            try {
+                const email = req.query.email;
+                if (!email) return res.status(400).send({ message: "Email required" });
+
+                const [transactionsCount, classesCount, tasksCount] = await Promise.all([
+                    transactionCollection.countDocuments({ email }),
+                    classCollection.countDocuments({ email }),
+                    taskCollection.countDocuments({ email }),
+                ]);
+
+                const incomeAgg = await transactionCollection.aggregate([
+                    { $match: { email, type: "Income" } },
+                    { $group: { _id: null, total: { $sum: "$amount" } } },
+                ]).toArray();
+
+                const expenseAgg = await transactionCollection.aggregate([
+                    { $match: { email, type: "Expense" } },
+                    { $group: { _id: null, total: { $sum: "$amount" } } },
+                ]).toArray();
+
+                res.send({
+                    totalTransactions: transactionsCount,
+                    totalClasses: classesCount,
+                    totalTasks: tasksCount,
+                    income: incomeAgg[0]?.total || 0,
+                    expense: expenseAgg[0]?.total || 0,
+                });
+            } catch (error) {
+                console.error(error);
+                res.status(500).send({ message: "Server error" });
+            }
+        });
+
+        // Expense breakdown by category
+        app.get("/stats/expense-by-category", verifyUser, async (req, res) => {
+            try {
+                const email = req.query.email;
+                if (!email) return res.status(400).send({ message: "Email required" });
+
+                const result = await transactionCollection.aggregate([
+                    { $match: { email, type: "Expense" } },
+                    { $group: { _id: "$category", total: { $sum: "$amount" } } },
+                    { $sort: { total: -1 } },
+                ]).toArray();
+
+                res.send(result);
+            } catch (error) {
+                console.error(error);
+                res.status(500).send({ message: "Server error" });
+            }
+        });
+
+     
+
+        // Income vs Expense trend over time (optional, good for line chart)
+        app.get("/stats/transactions-trend", verifyUser, async (req, res) => {
+            try {
+                const email = req.query.email;
+                if (!email) return res.status(400).send({ message: "Email required" });
+
+                const result = await transactionCollection.aggregate([
+                    { $match: { email } },
+                    {
+                        $group: {
+                            _id: { month: { $substr: ["$date", 0, 7] }, type: "$type" }, // YYYY-MM
+                            total: { $sum: "$amount" },
+                        },
+                    },
+                    {
+                        $group: {
+                            _id: "$_id.month",
+                            income: {
+                                $sum: {
+                                    $cond: [{ $eq: ["$_id.type", "Income"] }, "$total", 0],
+                                },
+                            },
+                            expense: {
+                                $sum: {
+                                    $cond: [{ $eq: ["$_id.type", "Expense"] }, "$total", 0],
+                                },
+                            },
+                        },
+                    },
+                    { $sort: { _id: 1 } },
+                ]).toArray();
+
+                res.send(result);
+            } catch (error) {
+                console.error(error);
+                res.status(500).send({ message: "Server error" });
+            }
+        });
+
+
+
+
+
     } finally {
 
     }
